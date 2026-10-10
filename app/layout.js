@@ -1,14 +1,10 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Business ERP",
-  description: "Business management system",
+  title: "BizManager | Business ERP",
+  description: "Business management dashboard",
 };
 
 export default function RootLayout({ children }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
+  return <html lang="en"><body>{children}</body></html>;
 }
