@@ -123,7 +123,7 @@ export async function GET() {
     console.error("Generating reports failed:", error);
 
     return NextResponse.json(
-      { message: "Failed to generate the formula." },
+      { message: "Failed to generate the reports." },
       { status: 500 }
     );
   }
