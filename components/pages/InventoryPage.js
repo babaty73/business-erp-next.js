@@ -88,36 +88,34 @@ export default function Inventory({
     }
   }
 
-  async function deleteProduct(product) {
-    const confirmed = window.confirm(
-      `Delete "${product.name}"? This action cannot be undone.`
+  
+async function deleteProduct(product) {
+  setDeletingId(product.id);
+  setDeleteError("");
+
+  try {
+    const response = await fetch(`/api/inventory/${product.id}`, {
+      method: "DELETE",
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to delete product.");
+    }
+
+    setData((old) =>
+      old.filter((item) => item.id !== product.id)
     );
 
-    if (!confirmed) return;
-
-    setDeletingId(product.id);
-    setDeleteError("");
-
-    try {
-      const response = await fetch(`/api/inventory/${product.id}`, {
-        method: "DELETE",
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to delete product.");
-      }
-
-      setData((old) =>
-        old.filter((item) => item.id !== product.id)
-      );
-    } catch (error) {
-      setDeleteError(error.message || "Failed to delete product.");
-    } finally {
-      setDeletingId(null);
-    }
+    setProductToDelete(null);
+  } catch (error) {
+    setDeleteError(error.message || "Failed to delete product.");
+  } finally {
+    setDeletingId(null);
   }
+}
+
 
   function openAddModal() {
     setEdit(null);
@@ -229,10 +227,12 @@ export default function Inventory({
 
                   <button
                     className="link"
-                    disabled={deletingId === product.id}
-                    onClick={() => deleteProduct(product)}
+                    onClick={() => {
+                      setDeleteError("");
+                      setProductToDelete(product);
+                    }}
                   >
-                    {deletingId === product.id ? "Deleting..." : "Delete"}
+                    Delete
                   </button>
                 </div>
               ),
@@ -242,6 +242,7 @@ export default function Inventory({
         />
       </section>
 
+      
       {modal && (
         <Modal
           title={edit ? "Edit product" : "Add product"}
@@ -263,45 +264,59 @@ export default function Inventory({
             }}
             onSave={save}
             fields={[
-              {
-                name: "name",
-                label: "Product name",
-                value: edit?.name || "",
-              },
-              {
-                name: "sku",
-                label: "SKU",
-                value: edit?.sku || "",
-              },
+              { name: "name", label: "Product name", value: edit?.name || "" },
+              { name: "sku", label: "SKU", value: edit?.sku || "" },
               {
                 name: "category",
                 label: "Category",
                 value: edit?.category || "Electronics",
-                options: [
-                  "Electronics",
-                  "Accessories",
-                  "Furniture",
-                  "Stationery",
-                ],
+                options: ["Electronics", "Accessories", "Furniture", "Stationery"],
               },
-              {
-                name: "stock",
-                label: "Stock quantity",
-                type: "number",
-                value: edit?.stock ?? 0,
-              },
-              {
-                name: "price",
-                label: "Unit price ($)",
-                type: "number",
-                value: edit?.price ?? 0,
-              },
+              { name: "stock", label: "Stock quantity", type: "number", value: edit?.stock ?? 0 },
+              { name: "price", label: "Unit price ($)", type: "number", value: edit?.price ?? 0 },
             ]}
           />
 
           {saving && <p>Saving product...</p>}
         </Modal>
       )}
+
+      {productToDelete && (
+        <Modal
+          title="Delete product?"
+          onClose={() => {
+            if (deletingId === null) {
+              setProductToDelete(null);
+            }
+          }}
+        >
+          <p>
+            Are you sure you want to delete{" "}
+            <strong>{productToDelete.name}</strong>?
+          </p>
+
+          <p className="muted">This action cannot be undone.</p>
+
+          {deleteError && <p role="alert">{deleteError}</p>}
+
+          <div className="flex justify-end gap-3 mt-4">
+            <Button
+              onClick={() => setProductToDelete(null)}
+              disabled={deletingId !== null}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={() => deleteProduct(productToDelete)}
+              disabled={deletingId !== null}
+            >
+              {deletingId !== null ? "Deleting..." : "Delete product"}
+            </Button>
+          </div>
+        </Modal>
+      )}
+
     </>
   );
 }
