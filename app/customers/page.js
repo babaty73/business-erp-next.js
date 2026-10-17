@@ -32,11 +32,11 @@ export default function Page() {
         }
 
         const formattedCustomers = result.data.map((customer) => ({
-          ...customer,
-          id: String(customer._id),
-          orders: 0,
-          spent: 0,
-        }));
+  ...customer,
+  id: String(customer._id),
+  orders: customer.orders ?? 0,
+  spent: customer.spent ?? 0,
+}));
 
         if (!cancelled) {
           setCustomers(formattedCustomers);

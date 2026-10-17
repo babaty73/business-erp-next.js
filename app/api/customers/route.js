@@ -1,79 +1,65 @@
-import { NextResponse } from "next/server";
-import connectDB from "@/lib/mongodb";
-import Customer from "@/models/Customer";
+import mongoose from "mongoose";
 
-export async function GET() {
-  try {
-    await connectDB();
-
-    const data = await Customer.find();
-
-    return NextResponse.json(
-      {
-        message: "Customer data retrieved.",
-        data,
+const orderItemSchema = new mongoose.Schema(
+  {
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Inventory",
+      required: true,
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: "Quantity must be a whole number.",
       },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Retrieving failed:", error.message);
+    },
+    unitPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false }
+);
 
-    return NextResponse.json(
-      {
-        message: "Retrieving data failed.",
+const orderSchema = new mongoose.Schema(
+  {
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      required: true,
+    },
+    items: {
+      type: [orderItemSchema],
+      required: true,
+      validate: {
+        validator: (items) => items.length > 0,
+        message: "An order must contain at least one product.",
       },
-      { status: 500 }
-    );
-  }
-}
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"],
+      default: "Pending",
+    },
+    payment: {
+      type: String,
+      enum: ["Pending", "Paid", "Refunded"],
+      default: "Pending",
+    },
+  },
+  { timestamps: true }
+);
 
+const Order =
+  mongoose.models.Order || mongoose.model("Order", orderSchema);
 
-
-export async function POST(request) {
-  try {
-    await connectDB();
-
-    const { name, email, status } = await request.json();
-
-    if (
-      typeof name !== "string" ||
-      !name.trim() ||
-      typeof email !== "string" ||
-      !email.trim() ||
-      (status !== undefined && !["Active", "Inactive"].includes(status))
-    ) {
-      return NextResponse.json(
-        { message: "Invalid or missing customer fields." },
-        { status: 400 }
-      );
-    }
-
-    const customer = await Customer.create({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      status: status ?? "Active",
-    });
-
-    return NextResponse.json(
-      {
-        message: "Customer created successfully.",
-        data: customer,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    if (error.code === 11000) {
-      return NextResponse.json(
-        { message: "A customer with this email already exists." },
-        { status: 409 }
-      );
-    }
-
-    console.error("Customer creation failed:", error);
-
-    return NextResponse.json(
-      { message: "Internal server error." },
-      { status: 500 }
-    );
-  }
-}
+export default Order;
