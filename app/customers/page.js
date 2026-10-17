@@ -11,13 +11,24 @@ export default function Page() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchCustomers() {
       try {
+        setLoading(true);
+        setError("");
+
         const response = await fetch("/api/customers");
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.message || "Failed to fetch customers.");
+          throw new Error(
+            result.message || "Failed to fetch customers."
+          );
+        }
+
+        if (!Array.isArray(result.data)) {
+          throw new Error("The customers API returned invalid data.");
         }
 
         const formattedCustomers = result.data.map((customer) => ({
@@ -27,15 +38,25 @@ export default function Page() {
           spent: 0,
         }));
 
-        setCustomers(formattedCustomers);
+        if (!cancelled) {
+          setCustomers(formattedCustomers);
+        }
       } catch (error) {
-        setError(error.message || "Failed to fetch customers.");
+        if (!cancelled) {
+          setError(error.message || "Failed to fetch customers.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchCustomers();
+
+    return () => {
+      cancelled = true;
+    };
   }, [setCustomers]);
 
   return (
