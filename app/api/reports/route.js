@@ -20,6 +20,7 @@ export async function GET() {
       departmentCount,
       employeeCount,
       departmentHeadcounts,
+      monthlyRevenue,
     ] = await Promise.all([
       Order.aggregate([
         {
@@ -65,6 +66,32 @@ export async function GET() {
           },
         },
       ]),
+
+      Order.aggregate([
+        {
+          $match: {
+            payment: "Paid",
+            status: { $ne: "Cancelled" },
+            createdAt: {
+              $gte: new Date(
+                new Date().getFullYear(),
+                new Date().getMonth() - 11,
+                1
+              ),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+            },
+            revenue: { $sum: "$amount" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
     ]);
 
     const countsByStatus = Object.fromEntries(
@@ -89,6 +116,35 @@ export async function GET() {
       employees: headcountMap.get(String(department._id)) || 0,
     }));
 
+    const now = new Date();
+
+    const revenueByMonth = new Map(
+      monthlyRevenue.map((item) => [
+        `${item._id.year}-${item._id.month}`,
+        item.revenue,
+      ])
+    );
+
+    const monthlyRevenueData = Array.from(
+      { length: 12 },
+      (_, index) => {
+        const date = new Date(
+          now.getFullYear(),
+          now.getMonth() - 11 + index,
+          1
+        );
+
+        const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+
+        return {
+          month: date.toLocaleString("en-US", {
+            month: "short",
+          }),
+          revenue: revenueByMonth.get(key) || 0,
+        };
+      }
+    );
+
     return NextResponse.json(
       {
         data: {
@@ -99,21 +155,28 @@ export async function GET() {
             ),
             byStatus: countsByStatus,
           },
+
           sales: {
             revenue: sales[0]?.revenue || 0,
             paidOrders: sales[0]?.paidOrders || 0,
           },
+
+          monthlyRevenue: monthlyRevenueData,
+
           inventory: {
             totalProducts: inventoryCount,
             lowStockThreshold: 5,
             lowStockProducts: lowStock,
           },
+
           customers: {
             total: customerCount,
           },
+
           employees: {
             total: employeeCount,
           },
+
           departments: departmentData,
         },
       },
