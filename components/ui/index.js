@@ -35,11 +35,73 @@ export function Modal({ title, onClose, children }) {
   return <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><section className="modal" role="dialog" aria-modal="true"><header className="modal-title"><h2>{title}</h2><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={17} /></button></header>{children}</section></div>;
 }
 
+
 export function RecordForm({ fields, onSave, onCancel }) {
-  const [values, setValues] = useState(Object.fromEntries(fields.map(f => [f.name, f.value ?? ""])));
-  const change = (name, value) => setValues(old => ({ ...old, [name]: value }));
-  return <form className="record-form" onSubmit={(e) => { e.preventDefault(); onSave(values); }}><div className="form-grid">{fields.map(f => <label className="field" key={f.name}><span>{f.label}</span>{f.options ? <select required value={values[f.name]} onChange={e => change(f.name, e.target.value)}>{f.options.map(o => <option key={o}>{o}</option>)}</select> : <input required type={f.type || "text"} min={f.type === "number" ? "0" : undefined} step={f.type === "number" ? "any" : undefined} value={values[f.name]} onChange={e => change(f.name, e.target.value)} placeholder={f.placeholder || ""} />}</label>)}</div><div className="modal-actions"><Button variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit">Save record</Button></div></form>;
+  const [values, setValues] = useState(
+    Object.fromEntries(fields.map((f) => [f.name, f.value ?? ""]))
+  );
+
+  const change = (name, value) => {
+    setValues((old) => ({ ...old, [name]: value }));
+  };
+
+  return (
+    <form
+      className="record-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(values);
+      }}
+    >
+      <div className="form-grid">
+        {fields.map((f) => (
+          <label className="field" key={f.name}>
+            <span>{f.label}</span>
+
+            {f.options ? (
+              <select
+                required={f.required !== false}
+                value={values[f.name]}
+                onChange={(e) => change(f.name, e.target.value)}
+              >
+                {f.options.map((option) => {
+                  const item =
+                    typeof option === "string"
+                      ? { label: option, value: option }
+                      : option;
+
+                  return (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <input
+                required={f.required !== false}
+                type={f.type || "text"}
+                min={f.type === "number" ? "0" : undefined}
+                step={f.type === "number" ? "any" : undefined}
+                value={values[f.name]}
+                onChange={(e) => change(f.name, e.target.value)}
+                placeholder={f.placeholder || ""}
+              />
+            )}
+          </label>
+        ))}
+      </div>
+
+      <div className="modal-actions">
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">Save record</Button>
+      </div>
+    </form>
+  );
 }
+
 
 export function Person({ name, detail, purple = false }) {
   return <div className="person"><span className={`avatar ${purple ? "purple" : ""}`}>{initials(name)}</span><span><strong>{name}</strong><small>{detail}</small></span></div>;

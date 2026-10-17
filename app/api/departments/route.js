@@ -21,10 +21,13 @@ export async function GET() {
     );
 
     const data = departments.map((department) => ({
-      ...department,
-      manager: department.manager?.name || "",
-      employees: countMap.get(String(department._id)) || 0,
-    }));
+  ...department,
+  manager: department.manager?.name || "",
+  managerId: department.manager?._id
+    ? String(department.manager._id)
+    : "",
+  employees: countMap.get(String(department._id)) || 0,
+}));
 
     return NextResponse.json({ data }, { status: 200 });
   } catch (error) {
@@ -85,10 +88,13 @@ export async function POST(request) {
       {
         message: "Department created.",
         data: {
-          ...result,
-          manager: result.manager?.name || "",
-          employees: 0,
-        },
+  ...result,
+  manager: result.manager?.name || "",
+  managerId: result.manager?._id
+    ? String(result.manager._id)
+    : "",
+  employees: 0,
+},
       },
       { status: 201 }
     );
