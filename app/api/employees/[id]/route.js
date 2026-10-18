@@ -3,9 +3,12 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Employee from "@/models/Employee";
+import { requireAdmin } from "@/lib/authorization";
 import Department from "@/models/Department";
 
 export async function GET(request, { params }) {
+  const { response } = await requireAdmin();
+if (response) return response;
   try {
     const { id } = await params;
 
@@ -45,6 +48,8 @@ export async function GET(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
+  const { response } = await requireAdmin();
+if (response) return response;
   try {
     const { id } = await params;
     const updates = await request.json();
@@ -147,6 +152,8 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const { response } = await requireAdmin();
+if (response) return response;
   try {
     const { id } = await params;
 

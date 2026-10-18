@@ -4,9 +4,13 @@ import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
+import { requireAdmin } from "@/lib/authorization";
 
 export async function GET() {
+  const { response } = await requireAdmin();
+if (response) return response;
   try {
+    
     await connectDB();
 
     const data = await Employee.find()
@@ -29,6 +33,8 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const { response } = await requireAdmin();
+if (response) return response;
   try {
     const { name, email, department, role, status } =
       await request.json();
