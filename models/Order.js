@@ -55,6 +55,25 @@ const orderSchema = new mongoose.Schema(
       enum: ["Pending", "Paid", "Refunded"],
       default: "Pending",
     },
+    paymentProof: {
+  url: {
+    type: String,
+    default: null,
+  },
+  publicId: {
+    type: String,
+    default: null,
+  },
+  reviewStatus: {
+    type: String,
+    enum: ["NotSubmitted", "Pending", "Approved", "Rejected"],
+    default: "NotSubmitted",
+  },
+  rejectionReason: {
+    type: String,
+    default: null,
+  },
+},
   },
   { timestamps: true }
 );

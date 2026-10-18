@@ -29,6 +29,7 @@ export default function Orders({ data, setData, setPage }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All statuses");
   const [error, setError] = useState("");
+  const [reviewReasons, setReviewReasons] = useState({});
   const [updating, setUpdating] = useState("");
 
   const rows = data.filter(
@@ -81,6 +82,46 @@ export default function Orders({ data, setData, setPage }) {
     }
   }
 
+async function reviewPayment(order, action) {
+  const reason =
+    action === "Rejected"
+      ? (reviewReasons[order.id] || "").trim()
+      : "";
+
+  if (action === "Rejected" && !reason) {
+    setError("Enter a rejection reason before rejecting the proof.");
+    return;
+  }
+
+  try {
+    setUpdating(`${order.id}-review`);
+    setError("");
+
+    const response = await fetch(
+      `/api/orders/${order.id}/payment-proof/review`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          rejectionReason: reason,
+        }),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Payment review failed.");
+    }
+
+    await refreshOrders();
+  } catch (err) {
+    setError(err.message || "Payment review failed.");
+  } finally {
+    setUpdating("");
+  }
+}
   return (
     <>
       <PageTitle
@@ -242,6 +283,96 @@ export default function Orders({ data, setData, setPage }) {
           </span>
         </div>
       </section>
+      <section className="panel section-panel">
+  <PageTitle
+    title="Payment Proof Review"
+    description="Verify bank transfer screenshots submitted by customers."
+  />
+
+  {data.filter(
+    (order) =>
+      order.paymentProof?.url &&
+      order.paymentProof?.reviewStatus === "Pending"
+  ).length === 0 ? (
+    <p>No payment proofs are waiting for review.</p>
+  ) : (
+    <div className="form-grid">
+      {data
+        .filter(
+          (order) =>
+            order.paymentProof?.url &&
+            order.paymentProof?.reviewStatus === "Pending"
+        )
+        .map((order) => (
+          <article
+            key={order.id}
+            className="panel section-panel"
+          >
+            <h3>Order #{order.id}</h3>
+
+            <p>Customer: {order.customer}</p>
+            <p>Amount: {money(order.amount)}</p>
+            <p>Payment: {order.payment}</p>
+
+            <a
+              href={order.paymentProof.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <img
+                src={order.paymentProof.url}
+                alt={`Payment proof for order ${order.id}`}
+                style={{
+                  width: "100%",
+                  maxWidth: "400px",
+                  maxHeight: "350px",
+                  objectFit: "contain",
+                  display: "block",
+                  margin: "12px 0",
+                }}
+              />
+              Open full screenshot
+            </a>
+
+            <label htmlFor={`reason-${order.id}`}>
+              Rejection reason (required only when rejecting)
+            </label>
+
+            <textarea
+              id={`reason-${order.id}`}
+              value={reviewReasons[order.id] || ""}
+              onChange={(event) =>
+                setReviewReasons((previous) => ({
+                  ...previous,
+                  [order.id]: event.target.value,
+                }))
+              }
+              maxLength={500}
+              placeholder="Explain why the proof is invalid..."
+              rows={3}
+            />
+
+            <div className="toolbar">
+              <Button
+                disabled={Boolean(updating)}
+                onClick={() => reviewPayment(order, "Approved")}
+              >
+                Approve Payment
+              </Button>
+
+              <Button
+                variant="secondary"
+                disabled={Boolean(updating)}
+                onClick={() => reviewPayment(order, "Rejected")}
+              >
+                Reject Proof
+              </Button>
+            </div>
+          </article>
+        ))}
+    </div>
+  )}
+</section>
     </>
   );
 }

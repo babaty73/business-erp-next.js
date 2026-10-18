@@ -3,25 +3,57 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Inventory from "@/models/Inventory";
 import { requireAdmin } from "@/lib/authorization";
+import mongoose from "mongoose";
+import Customer from "@/models/Customer";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const session = await getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { message: "Authentication required." },
+        { status: 401 }
+      );
+    }
+
     await connectDB();
 
-    const data = await Inventory.find();
+    if (session.role === "admin" && session.userId === "admin") {
+      // Admin access is allowed.
+    } else if (
+      session.role === "customer" &&
+      mongoose.isValidObjectId(session.userId)
+    ) {
+      const customer = await Customer.findById(session.userId)
+        .select("status")
+        .lean();
+
+      if (!customer || customer.status !== "Active") {
+        return NextResponse.json(
+          { message: "Account not available." },
+          { status: 401 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { message: "Access denied." },
+        { status: 403 }
+      );
+    }
+
+    const data = await Inventory.find().sort({ name: 1 }).lean();
 
     return NextResponse.json(
-      {
-        message: "Inventory data retrieved.",
-        data,
-      },
+      { message: "Inventory data retrieved.", data },
       { status: 200 }
     );
   } catch (error) {
-    console.error("Retrieving failed:", error.message);
+    console.error("Retrieving inventory failed:", error);
 
     return NextResponse.json(
-      { message: "Retrieving data failed." },
+      { message: "Retrieving inventory data failed." },
       { status: 500 }
     );
   }
