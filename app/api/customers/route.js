@@ -1,65 +1,118 @@
-import mongoose from "mongoose";
+import { NextResponse } from "next/server";
+import connectDB from "@/lib/mongodb";
+import Customer from "@/models/Customer";
+import Order from "@/models/Order";
 
-const orderItemSchema = new mongoose.Schema(
-  {
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Inventory",
-      required: true,
-    },
-    quantity: {
-      type: Number,
-      required: true,
-      min: 1,
-      validate: {
-        validator: Number.isInteger,
-        message: "Quantity must be a whole number.",
+export async function GET() {
+  try {
+    await connectDB();
+
+    const [customers, orderTotals] = await Promise.all([
+      Customer.find().lean(),
+
+      Order.aggregate([
+        {
+          $group: {
+            _id: "$customer",
+            orders: { $sum: 1 },
+            spent: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$payment", "Paid"] },
+                  "$amount",
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
+    ]);
+
+    const totalsByCustomer = new Map(
+      orderTotals.map((item) => [
+        String(item._id),
+        { orders: item.orders, spent: item.spent },
+      ])
+    );
+
+    const data = customers.map((customer) => {
+      const totals = totalsByCustomer.get(String(customer._id));
+
+      return {
+        ...customer,
+        orders: totals?.orders ?? 0,
+        spent: totals?.spent ?? 0,
+      };
+    });
+
+    return NextResponse.json(
+      {
+        message: "Customer data retrieved.",
+        data,
       },
-    },
-    unitPrice: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-  },
-  { _id: false }
-);
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Retrieving customers failed:", error);
 
-const orderSchema = new mongoose.Schema(
-  {
-    customer: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer",
-      required: true,
-    },
-    items: {
-      type: [orderItemSchema],
-      required: true,
-      validate: {
-        validator: (items) => items.length > 0,
-        message: "An order must contain at least one product.",
+    return NextResponse.json(
+      { message: "Retrieving customer data failed." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request) {
+  try {
+    await connectDB();
+
+    const { name, email, status } = await request.json();
+
+    if (
+      typeof name !== "string" ||
+      !name.trim() ||
+      typeof email !== "string" ||
+      !email.trim() ||
+      (status !== undefined &&
+        !["Active", "Inactive"].includes(status))
+    ) {
+      return NextResponse.json(
+        { message: "Invalid or missing customer fields." },
+        { status: 400 }
+      );
+    }
+
+    const customer = await Customer.create({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      status: status ?? "Active",
+    });
+
+    return NextResponse.json(
+      {
+        message: "Customer created successfully.",
+        data: {
+          ...customer.toObject(),
+          orders: 0,
+          spent: 0,
+        },
       },
-    },
-    amount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-    status: {
-      type: String,
-      enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"],
-      default: "Pending",
-    },
-    payment: {
-      type: String,
-      enum: ["Pending", "Paid", "Refunded"],
-      default: "Pending",
-    },
-  },
-  { timestamps: true }
-);
+      { status: 201 }
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return NextResponse.json(
+        { message: "A customer with this email already exists." },
+        { status: 409 }
+      );
+    }
 
-const Order =
-  mongoose.models.Order || mongoose.model("Order", orderSchema);
+    console.error("Customer creation failed:", error);
 
-export default Order;
+    return NextResponse.json(
+      { message: "Internal server error." },
+      { status: 500 }
+    );
+  }
+}

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Inventory from "@/models/Inventory";
+import Order from "@/models/Order";
 
 export async function GET(request, { params }) {
   try {
@@ -112,6 +113,7 @@ export async function PATCH(request, { params }) {
   }
 }
 
+
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
@@ -125,7 +127,7 @@ export async function DELETE(request, { params }) {
 
     await connectDB();
 
-    const product = await Inventory.findByIdAndDelete(id);
+    const product = await Inventory.findById(id);
 
     if (!product) {
       return NextResponse.json(
@@ -133,6 +135,22 @@ export async function DELETE(request, { params }) {
         { status: 404 }
       );
     }
+
+    const usedInOrder = await Order.exists({
+      "items.product": id,
+    });
+
+    if (usedInOrder) {
+      return NextResponse.json(
+        {
+          message:
+            "This product cannot be deleted because it is referenced by existing orders.",
+        },
+        { status: 409 }
+      );
+    }
+
+    await Inventory.findByIdAndDelete(id);
 
     return NextResponse.json(
       { message: "Product deleted." },

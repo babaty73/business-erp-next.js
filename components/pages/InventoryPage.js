@@ -149,8 +149,8 @@ async function deleteProduct(product) {
         />
         <Stat
           label="Low stock"
-          value={data.filter((p) => p.stock > 0 && p.stock <= 10).length}
-          change="Needs review"
+          value={data.filter((p) => p.stock > 0 && p.stock <= 5).length}
+          change="1–5 units remaining"
           icon="⚠"
           tone="amber"
         />
