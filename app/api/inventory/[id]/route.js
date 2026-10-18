@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Inventory from "@/models/Inventory";
 import Order from "@/models/Order";
+import { requireAdmin } from "@/lib/authorization";
 
 export async function GET(request, { params }) {
   try {
@@ -40,12 +41,23 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
+    const { response } = await requireAdmin();
+    if (response) return response;
+
     const { id } = await params;
-    const updates = await request.json();
 
     if (!mongoose.isValidObjectId(id)) {
       return NextResponse.json(
         { message: "Invalid product ID." },
+        { status: 400 }
+      );
+    }
+
+    const updates = await request.json();
+
+    if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
+      return NextResponse.json(
+        { message: "Invalid update body." },
         { status: 400 }
       );
     }
@@ -69,11 +81,14 @@ export async function PATCH(request, { params }) {
       ("sku" in updates &&
         (typeof updates.sku !== "string" || !updates.sku.trim())) ||
       ("category" in updates &&
-        (typeof updates.category !== "string" || !updates.category.trim())) ||
+        (typeof updates.category !== "string" ||
+          !updates.category.trim())) ||
       ("stock" in updates &&
-        (!Number.isFinite(updates.stock) || updates.stock < 0)) ||
+        (!Number.isInteger(updates.stock) || updates.stock < 0)) ||
       ("price" in updates &&
-        (!Number.isFinite(updates.price) || updates.price < 0))
+        (typeof updates.price !== "number" ||
+          !Number.isFinite(updates.price) ||
+          updates.price < 0))
     ) {
       return NextResponse.json(
         { message: "Invalid product values." },
@@ -113,9 +128,11 @@ export async function PATCH(request, { params }) {
   }
 }
 
-
 export async function DELETE(request, { params }) {
   try {
+    const { response } = await requireAdmin();
+    if (response) return response;
+
     const { id } = await params;
 
     if (!mongoose.isValidObjectId(id)) {

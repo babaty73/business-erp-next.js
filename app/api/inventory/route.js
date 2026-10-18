@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Inventory from "@/models/Inventory";
+import { requireAdmin } from "@/lib/authorization";
 
 export async function GET() {
   try {
@@ -20,17 +21,18 @@ export async function GET() {
     console.error("Retrieving failed:", error.message);
 
     return NextResponse.json(
-      {
-        message: "Retrieving data failed.",
-      },
+      { message: "Retrieving data failed." },
       { status: 500 }
     );
   }
 }
 
-
 export async function POST(request) {
   try {
+    const { response } = await requireAdmin();
+
+    if (response) return response;
+
     await connectDB();
 
     const data = await request.json();
@@ -42,10 +44,11 @@ export async function POST(request) {
       !category?.trim() ||
       stock === undefined ||
       stock === null ||
+      !Number.isFinite(stock) ||
+      !Number.isInteger(stock) ||
+      !Number.isFinite(price) ||
       price === undefined ||
       price === null ||
-      !Number.isFinite(stock) ||
-      !Number.isFinite(price) ||
       stock < 0 ||
       price < 0
     ) {
