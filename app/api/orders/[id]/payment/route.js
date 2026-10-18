@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Order from "@/models/Order";
+import { requireAdmin } from "@/lib/authorization";
 
 export async function PATCH(request, { params }) {
   const { id } = await params;
-
+const { response } = await requireAdmin();
+if (response) return response;
   if (!mongoose.isValidObjectId(id)) {
     return NextResponse.json(
       { message: "Invalid order ID." },

@@ -6,8 +6,12 @@ import Inventory from "@/models/Inventory";
 import Customer from "@/models/Customer";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
+import { requireAdmin } from "@/lib/authorization";
 
 export async function GET() {
+  const { response } = await requireAdmin();
+  if (response) return response;
+
   try {
     await connectDB();
 

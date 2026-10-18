@@ -4,6 +4,9 @@ import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Inventory from "@/models/Inventory";
+import { getSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authorization";
+import Customer from "@/models/Customer";
 
 const allowedTransitions = {
   Pending: ["Processing", "Cancelled"],
@@ -25,8 +28,47 @@ export async function GET(request, { params }) {
     }
 
     await connectDB();
+const session = await getSession();
 
-    const order = await Order.findById(id)
+if (!session) {
+  return NextResponse.json(
+    { message: "Authentication required." },
+    { status: 401 }
+  );
+}
+
+if (
+  session.role !== "admin" ||
+  session.userId !== "admin"
+) {
+  if (
+    session.role !== "customer" ||
+    !mongoose.isValidObjectId(session.userId)
+  ) {
+    return NextResponse.json(
+      { message: "Access denied." },
+      { status: 403 }
+    );
+  }
+
+
+  const customer = await Customer.findById(session.userId)
+    .select("status")
+    .lean();
+
+  if (!customer || customer.status !== "Active") {
+    return NextResponse.json(
+      { message: "Account not available." },
+      { status: 401 }
+    );
+  }
+}
+    const filter =
+  session.role === "admin" && session.userId === "admin"
+    ? { _id: id }
+    : { _id: id, customer: session.userId };
+
+const order = await Order.findOne(filter)
       .populate("customer", "name email")
       .populate("items.product", "name sku")
       .lean();
@@ -51,7 +93,8 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   const { id } = await params;
-
+const { response } = await requireAdmin();
+if (response) return response;
   if (!mongoose.isValidObjectId(id)) {
     return NextResponse.json(
       { message: "Invalid order ID." },

@@ -1,15 +1,54 @@
+
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Customer from "@/models/Customer";
 import Inventory from "@/models/Inventory";
+import { getSession } from "@/lib/auth";
+import { requireCustomer } from "@/lib/authorization";
 
 export async function GET() {
   try {
+    const session = await getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { message: "Authentication required." },
+        { status: 401 }
+      );
+    }
+
     await connectDB();
 
-    const orders = await Order.find()
+    let filter = {};
+
+    if (session.role === "admin" && session.userId === "admin") {
+      // Admins can see all orders.
+    } else if (
+      session.role === "customer" &&
+      mongoose.isValidObjectId(session.userId)
+    ) {
+      const customer = await Customer.findById(session.userId)
+        .select("status")
+        .lean();
+
+      if (!customer || customer.status !== "Active") {
+        return NextResponse.json(
+          { message: "Account not available." },
+          { status: 401 }
+        );
+      }
+
+      filter = { customer: session.userId };
+    } else {
+      return NextResponse.json(
+        { message: "Access denied." },
+        { status: 403 }
+      );
+    }
+
+    const orders = await Order.find(filter)
       .populate("customer", "name email")
       .populate("items.product", "name sku")
       .sort({ createdAt: -1 })
@@ -38,6 +77,10 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const { session: authSession, response } = await requireCustomer();
+
+  if (response) return response;
+
   let body;
 
   try {
@@ -49,53 +92,62 @@ export async function POST(request) {
     );
   }
 
-  const { customerId, items } = body;
+  const { items } = body;
 
-  if (
-    !mongoose.isValidObjectId(customerId) ||
-    !Array.isArray(items) ||
-    items.length === 0
-  ) {
+  if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json(
-      { message: "A valid customer and at least one product are required." },
+      { message: "At least one product is required." },
       { status: 400 }
     );
   }
 
-  // Validate and combine repeated products.
   const quantities = new Map();
 
   for (const item of items) {
     if (
+      !item ||
       !mongoose.isValidObjectId(item.productId) ||
       !Number.isInteger(item.quantity) ||
       item.quantity < 1
     ) {
       return NextResponse.json(
-        { message: "Each item needs a valid product ID and positive whole-number quantity." },
+        {
+          message:
+            "Each item needs a valid product ID and positive whole-number quantity.",
+        },
         { status: 400 }
       );
     }
 
     const id = String(item.productId);
-    quantities.set(id, (quantities.get(id) || 0) + item.quantity);
+    const totalQuantity = (quantities.get(id) || 0) + item.quantity;
+
+    if (!Number.isSafeInteger(totalQuantity)) {
+      return NextResponse.json(
+        { message: "Requested quantity is too large." },
+        { status: 400 }
+      );
+    }
+
+    quantities.set(id, totalQuantity);
   }
 
-  let session;
+  let dbSession;
 
   try {
     await connectDB();
 
-    session = await mongoose.startSession();
+    dbSession = await mongoose.startSession();
 
     let orderId;
 
-    await session.withTransaction(async () => {
-      const customer = await Customer.findById(customerId).session(session);
+    await dbSession.withTransaction(async () => {
+      const customer = await Customer.findById(authSession.userId)
+        .session(dbSession);
 
-      if (!customer) {
-        throw Object.assign(new Error("Customer not found."), {
-          status: 404,
+      if (!customer || customer.status !== "Active") {
+        throw Object.assign(new Error("Account not available."), {
+          status: 401,
         });
       }
 
@@ -103,12 +155,13 @@ export async function POST(request) {
 
       const products = await Inventory.find({
         _id: { $in: productIds },
-      }).session(session);
+      }).session(dbSession);
 
       if (products.length !== productIds.length) {
-        throw Object.assign(new Error("One or more products were not found."), {
-          status: 404,
-        });
+        throw Object.assign(
+          new Error("One or more products were not found."),
+          { status: 404 }
+        );
       }
 
       const productMap = new Map(
@@ -121,14 +174,13 @@ export async function POST(request) {
       for (const [productId, quantity] of quantities) {
         const product = productMap.get(productId);
 
-        // Deduct stock only if enough is still available.
         const updatedProduct = await Inventory.findOneAndUpdate(
           {
             _id: product._id,
             stock: { $gte: quantity },
           },
           { $inc: { stock: -quantity } },
-          { new: true, session }
+          { new: true, session: dbSession }
         );
 
         if (!updatedProduct) {
@@ -147,6 +199,12 @@ export async function POST(request) {
         amount += product.price * quantity;
       }
 
+      if (!Number.isFinite(amount)) {
+        throw Object.assign(new Error("Order total is invalid."), {
+          status: 400,
+        });
+      }
+
       const [order] = await Order.create(
         [
           {
@@ -157,7 +215,7 @@ export async function POST(request) {
             payment: "Pending",
           },
         ],
-        { session }
+        { session: dbSession }
       );
 
       orderId = order._id;
@@ -199,8 +257,8 @@ export async function POST(request) {
       { status: 500 }
     );
   } finally {
-    if (session) {
-      await session.endSession();
+    if (dbSession) {
+      await dbSession.endSession();
     }
   }
 }
