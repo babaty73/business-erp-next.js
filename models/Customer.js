@@ -15,6 +15,10 @@ const customerSchema = new mongoose.Schema(
       trim: true,
       unique: true,
     },
+    passwordHash: {
+      type: String,
+      select: false,
+    },
     status: {
       type: String,
       enum: ["Active", "Inactive"],
