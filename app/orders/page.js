@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import OrdersPage from "@/components/pages/OrdersPage";
 import { useERP } from "@/components/erp-context";
 import { navigateToPage } from "@/lib/navigation";
+import AuthGate from "@/components/auth/AuthGate";
 
 export default function Page() {
   const router = useRouter();
@@ -68,10 +69,12 @@ export default function Page() {
   }
 
   return (
-    <OrdersPage
-      data={orders}
-      setData={setOrders}
-      setPage={(label) => navigateToPage(router, label)}
-    />
+    <AuthGate allowedRoles={["admin"]} redirectTo="/admin/login">
+      <OrdersPage
+        data={orders}
+        setData={setOrders}
+        setPage={(label) => navigateToPage(router, label)}
+      />
+    </AuthGate>
   );
 }

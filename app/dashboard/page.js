@@ -1,10 +1,10 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import DashboardPage from "@/components/pages/DashboardPage";
 import { useRouter } from "next/navigation";
 import { navigateToPage } from "@/lib/navigation";
+import AuthGate from "@/components/auth/AuthGate";
 
 export default function Page() {
   const router = useRouter();
@@ -52,12 +52,14 @@ export default function Page() {
   }, []);
 
   return (
-    <DashboardPage
-      reports={reports}
-      orders={orders}
-      loading={loading}
-      error={error}
-      setPage={(label) => navigateToPage(router, label)}
-    />
+    <AuthGate allowedRoles={["admin"]} redirectTo="/admin/login">
+      <DashboardPage
+        reports={reports}
+        orders={orders}
+        loading={loading}
+        error={error}
+        setPage={(label) => navigateToPage(router, label)}
+      />
+    </AuthGate>
   );
 }

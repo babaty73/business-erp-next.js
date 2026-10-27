@@ -1,9 +1,9 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import InventoryPage from "@/components/pages/InventoryPage";
 import { useERP } from "@/components/erp-context";
+import AuthGate from "@/components/auth/AuthGate";
 
 export default function Page() {
   const { products, setProducts } = useERP();
@@ -37,11 +37,13 @@ export default function Page() {
   }, [setProducts]);
 
   return (
-    <InventoryPage
-      data={products}
-      setData={setProducts}
-      loading={loading}
-      error={error}
-    />
+    <AuthGate allowedRoles={["admin"]} redirectTo="/admin/login">
+      <InventoryPage
+        data={products}
+        setData={setProducts}
+        loading={loading}
+        error={error}
+      />
+    </AuthGate>
   );
 }

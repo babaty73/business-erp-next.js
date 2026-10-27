@@ -1,9 +1,9 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import CustomersPage from "@/components/pages/CustomersPage";
 import { useERP } from "@/components/erp-context";
+import AuthGate from "@/components/auth/AuthGate";
 
 export default function Page() {
   const { customers, setCustomers } = useERP();
@@ -22,9 +22,7 @@ export default function Page() {
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            result.message || "Failed to fetch customers."
-          );
+          throw new Error(result.message || "Failed to fetch customers.");
         }
 
         if (!Array.isArray(result.data)) {
@@ -32,11 +30,11 @@ export default function Page() {
         }
 
         const formattedCustomers = result.data.map((customer) => ({
-  ...customer,
-  id: String(customer._id),
-  orders: customer.orders ?? 0,
-  spent: customer.spent ?? 0,
-}));
+          ...customer,
+          id: String(customer._id),
+          orders: customer.orders ?? 0,
+          spent: customer.spent ?? 0,
+        }));
 
         if (!cancelled) {
           setCustomers(formattedCustomers);
@@ -60,11 +58,13 @@ export default function Page() {
   }, [setCustomers]);
 
   return (
-    <CustomersPage
-      data={customers}
-      setData={setCustomers}
-      loading={loading}
-      error={error}
-    />
+    <AuthGate allowedRoles={["admin"]} redirectTo="/admin/login">
+      <CustomersPage
+        data={customers}
+        setData={setCustomers}
+        loading={loading}
+        error={error}
+      />
+    </AuthGate>
   );
 }

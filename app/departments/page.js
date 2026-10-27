@@ -1,9 +1,9 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import DepartmentsPage from "@/components/pages/DepartmentsPage";
 import { useERP } from "@/components/erp-context";
+import AuthGate from "@/components/auth/AuthGate";
 
 export default function Page() {
   const { departments, setDepartments } = useERP();
@@ -15,17 +15,15 @@ export default function Page() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [departmentResponse, employeeResponse] =
-          await Promise.all([
-            fetch("/api/departments"),
-            fetch("/api/employees"),
-          ]);
+        const [departmentResponse, employeeResponse] = await Promise.all([
+          fetch("/api/departments"),
+          fetch("/api/employees"),
+        ]);
 
-        const [departmentResult, employeeResult] =
-          await Promise.all([
-            departmentResponse.json(),
-            employeeResponse.json(),
-          ]);
+        const [departmentResult, employeeResult] = await Promise.all([
+          departmentResponse.json(),
+          employeeResponse.json(),
+        ]);
 
         if (!departmentResponse.ok) {
           throw new Error(
@@ -59,12 +57,14 @@ export default function Page() {
   }, [setDepartments]);
 
   return (
-    <DepartmentsPage
-      data={departments}
-      setData={setDepartments}
-      employees={employees}
-      loading={loading}
-      error={error}
-    />
+    <AuthGate allowedRoles={["admin"]} redirectTo="/admin/login">
+      <DepartmentsPage
+        data={departments}
+        setData={setDepartments}
+        employees={employees}
+        loading={loading}
+        error={error}
+      />
+    </AuthGate>
   );
 }

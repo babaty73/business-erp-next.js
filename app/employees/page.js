@@ -1,9 +1,9 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import EmployeesPage from "@/components/pages/EmployeesPage";
 import { useERP } from "@/components/erp-context";
+import AuthGate from "@/components/auth/AuthGate";
 
 export default function Page() {
   const { employees, setEmployees } = useERP();
@@ -19,17 +19,15 @@ export default function Page() {
         setLoading(true);
         setError("");
 
-        const [employeeResponse, departmentResponse] =
-          await Promise.all([
-            fetch("/api/employees"),
-            fetch("/api/departments"),
-          ]);
+        const [employeeResponse, departmentResponse] = await Promise.all([
+          fetch("/api/employees"),
+          fetch("/api/departments"),
+        ]);
 
-        const [employeeResult, departmentResult] =
-          await Promise.all([
-            employeeResponse.json(),
-            departmentResponse.json(),
-          ]);
+        const [employeeResult, departmentResult] = await Promise.all([
+          employeeResponse.json(),
+          departmentResponse.json(),
+        ]);
 
         if (!employeeResponse.ok) {
           throw new Error(
@@ -52,22 +50,18 @@ export default function Page() {
 
         const departmentList = departmentResult.data;
 
-        const formattedEmployees = employeeResult.data.map(
-          (employee) => {
-            const department = departmentList.find(
-              (item) => item.name === employee.department
-            );
+        const formattedEmployees = employeeResult.data.map((employee) => {
+          const department = departmentList.find(
+            (item) => item.name === employee.department
+          );
 
-            return {
-              ...employee,
-              id: String(employee._id),
-              department: employee.department || "",
-              departmentId: department
-                ? String(department._id)
-                : "",
-            };
-          }
-        );
+          return {
+            ...employee,
+            id: String(employee._id),
+            department: employee.department || "",
+            departmentId: department ? String(department._id) : "",
+          };
+        });
 
         if (!cancelled) {
           setDepartments(departmentList);
@@ -92,12 +86,14 @@ export default function Page() {
   }, [setEmployees]);
 
   return (
-    <EmployeesPage
-      data={employees}
-      setData={setEmployees}
-      departments={departments}
-      loading={loading}
-      error={error}
-    />
+    <AuthGate allowedRoles={["admin"]} redirectTo="/admin/login">
+      <EmployeesPage
+        data={employees}
+        setData={setEmployees}
+        departments={departments}
+        loading={loading}
+        error={error}
+      />
+    </AuthGate>
   );
 }
