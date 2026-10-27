@@ -1,13 +1,12 @@
 "use client";
 import { createContext, useContext, useState } from "react";
-import { seedEmployees, seedDepartments, seedProducts, seedOrders, seedCustomers } from "@/lib/mock-data";
 const ERPContext = createContext(null);
 export function ERPProvider({ children }) {
-  const [employees, setEmployees] = useState(seedEmployees);
-  const [departments, setDepartments] = useState(seedDepartments);
-  const [products, setProducts] = useState(seedProducts);
-  const [orders, setOrders] = useState(seedOrders);
-  const [customers, setCustomers] = useState(seedCustomers);
+  const [employees, setEmployees] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   return <ERPContext.Provider value={{ employees, setEmployees, departments, setDepartments, products, setProducts, orders, setOrders, customers, setCustomers, darkMode, setDarkMode }}>{children}</ERPContext.Provider>;
 }
